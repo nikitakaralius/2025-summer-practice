@@ -74,3 +74,6 @@ Author_guide_SPbPU-student-thesis.tex
 
 # idea
 *.idea
+
+# build
+build
