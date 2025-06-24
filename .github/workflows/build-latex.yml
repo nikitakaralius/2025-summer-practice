@@ -10,6 +10,7 @@ on:
 jobs:
   build-latex:
     runs-on: ubuntu-latest
+    container: blang/latex:ctanbasic
 
     steps:
       - name: Checkout repository
