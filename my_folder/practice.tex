@@ -1,6 +1,6 @@
-%%% Титульник отчета по практике / Practice report title 
+%%% Титульник отчета по практике / Practice report title
 %%
-%% добавить лист в pdf-навигацию 
+%% добавить лист в pdf-навигацию
 %% add to pdf navigation menu
 %%
 \pdfbookmark[-1]{\pdfTitle}{tit}
@@ -11,35 +11,6 @@
 \savegeometry{NoFoot}%
 \makeatother
 
-%%% Распечатать версию документа / Print document version
-%%
-\begin{flushright}
-	%	\vspace{0pt plus0.1fill}
-	\boxed{\small
-		\begin{tabular}{r} 
-			\textbf{Пример отчета по практике <<SPbPU-student-thesis-template>>.} %\\ % перенос на новую строку
-			\textbf{Версия от \today % \; время:  \currenttime. % время версии
-			}
-		\end{tabular}
-	} %end boxed
-	%	\vspace*{-5pt} % раскомментировать, если не хватает места
-	\vspace{0pt plus0.1fill} % раскоментировать, если хватает места
-\end{flushright}
-
-
-
-
-
-
-% TODO Exact match of font size
-%{\centering%
-%	\footnotesize
-%	\MakeUppercase{Федеральное государственное автономное образовательное учреждение\\высшего образования}\\%
-%		{\bfseries <<\SPbPU>>\\%
-%			\institute\\%
-%			\School}
-%}
-
 {\centering%
 	\small%
 	\MakeUppercase{\SPbPUOfficialPrefix}\\
@@ -49,7 +20,7 @@
 	\MakeUppercase{\School}
 	}
 \par}%
-	
+
 
 \vspace{0pt plus1fill} %число перед fill = кратность относительно некоторого расстояния fill, кусками которого заполнены пустые места
 
@@ -61,7 +32,7 @@
 
 
 {\centering%
-	{\bfseries{} 
+	{\bfseries{}
 	\DocType\\
 	на тему: <<\practiceTitle>>}\\
 
@@ -89,12 +60,12 @@
 
 
 
-{\noindent \bfseries 
+{\noindent \bfseries
 	Консультант практики от \SPbPUOfficialShort:
 %	Консультанты практики от \SPbPUOfficialShort:
-} 
+}
 {\noindent \expandafter \ulined \ConsultantExtraFull, \ConsultantExtraDegree}.%,      %% первый консультант Ф.И.О., должность, степень
-%{\noindent \expandafter \ulined \ConsultantExtraTwoFull, \ConsultantExtraTwoDegree.}  %% второй консультант Ф.И.О., должность, степень 
+%{\noindent \expandafter \ulined \ConsultantExtraTwoFull, \ConsultantExtraTwoDegree.}  %% второй консультант Ф.И.О., должность, степень
 
 {\noindent {\bfseries Оценка:} \uline{\hspace*{0.1\textheight}} % НЕ ЗАПОЛНЯЕМ!
 
@@ -108,14 +79,14 @@
 	Консультант практики		&	&\\
 	от \SPbPUOfficialShort		&	& \ConsultantExtra\\[\mfloatsep]
 %							&	& \ConsultantExtraTwo\\[\mfloatsep]
-	
+
 	Обучающийся				&	&\Author\\[\mfloatsep]
 	Дата: \uline{\PracticeEndDate}		&	&
 \end{tabularx} %
 
 
 %
-\vspace{0pt plus4fill}% 
+\vspace{0pt plus4fill}%
 
 \restoregeometry
 \newpage
