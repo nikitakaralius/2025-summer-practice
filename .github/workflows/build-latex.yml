@@ -16,11 +16,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install LaTeX
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y texlive-full
-
       - name: Build LaTeX document
         continue-on-error: true
         run: |
