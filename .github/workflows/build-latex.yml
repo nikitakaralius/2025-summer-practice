@@ -1,0 +1,69 @@
+name: Build and Publish LaTeX Document
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build-latex:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install LaTeX
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y texlive-full
+
+      - name: Build LaTeX document
+        run: |
+          pdflatex -interaction=nonstopmode My_practice.tex
+          # Run twice to resolve references
+          pdflatex -interaction=nonstopmode My_practice.tex
+
+      - name: Check if PDF was created
+        run: |
+          if [ ! -f "My_practice.pdf" ]; then
+            echo "PDF file was not created!"
+            exit 1
+          fi
+          ls -la My_practice.pdf
+
+      - name: Upload PDF as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: latex-document
+          path: My_practice.pdf
+          retention-days: 30
+
+      - name: Create Release (on main/master branch)
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: v${{ github.run_number }}
+          release_name: Practice Report v${{ github.run_number }}
+          body: |
+            Automatically generated practice report PDF
+            
+            Built from commit: ${{ github.sha }}
+          draft: false
+          prerelease: false
+        id: create_release
+
+      - name: Upload PDF to Release
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: My_practice.pdf
+          asset_name: My_practice.pdf
+          asset_content_type: application/pdf
