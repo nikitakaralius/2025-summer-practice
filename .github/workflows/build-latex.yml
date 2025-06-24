@@ -10,6 +10,7 @@ on:
 jobs:
   build-latex:
     runs-on: ubuntu-latest
+    container: cristiangreco/pdflatex
 
     steps:
       - name: Checkout repository
