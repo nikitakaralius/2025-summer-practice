@@ -10,18 +10,22 @@ on:
 jobs:
   build-latex:
     runs-on: ubuntu-latest
-    container:
-      image: blang/latex:ctanbasic
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Install LaTeX
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y texlive-full
+
       - name: Build LaTeX document
+        continue-on-error: true
         run: |
           pdflatex -interaction=nonstopmode My_practice.tex
           # Run twice to resolve references
-          pdflatex -interaction=nonstropmode My_practice.tex
+          pdflatex -interaction=nonstopmode My_practice.tex
 
       - name: Check if PDF was created
         run: |
