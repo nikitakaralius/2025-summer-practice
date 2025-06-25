@@ -37,30 +37,3 @@ jobs:
           name: latex-document
           path: My_practice.pdf
           retention-days: 30
-
-      - name: Create Release (on main/master branch)
-        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: v${{ github.run_number }}
-          release_name: Practice Report v${{ github.run_number }}
-          body: |
-            Automatically generated practice report PDF
-            
-            Built from commit: ${{ github.sha }}
-          draft: false
-          prerelease: false
-        id: create_release
-
-      - name: Upload PDF to Release
-        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: My_practice.pdf
-          asset_name: My_practice.pdf
-          asset_content_type: application/pdf
