@@ -19,21 +19,21 @@ jobs:
       - name: Build LaTeX document
         continue-on-error: true
         run: |
-          pdflatex -interaction=nonstopmode My_practice.tex
+          pdflatex -interaction=nonstopmode 2025-summer-practice.tex
           # Run twice to resolve references
-          pdflatex -interaction=nonstopmode My_practice.tex
+          pdflatex -interaction=nonstopmode 2025-summer-practice.tex
 
       - name: Check if PDF was created
         run: |
-          if [ ! -f "My_practice.pdf" ]; then
+          if [ ! -f "2025-summer-practice.pdf" ]; then
             echo "PDF file was not created!"
             exit 1
           fi
-          ls -la My_practice.pdf
+          ls -la 2025-summer-practice.pdf
 
       - name: Upload PDF as artifact
         uses: actions/upload-artifact@v4
         with:
           name: latex-document
-          path: My_practice.pdf
+          path: 2025-summer-practice.pdf
           retention-days: 30
