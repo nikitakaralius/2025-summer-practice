@@ -5,7 +5,7 @@
 
 Хорошим стилем является наличие введения к главе, которое \textit{начинается непосредственно после названия главы, без оформления в виде отдельного параграфа}. Во введении может быть описана цель написания главы, а также приведена краткая структура главы. Например, в параграфе \ref{ch1:sec1} приведены примеры оформления одиночных формул, рисунков и таблицы. Параграф \ref{ch1:sec2} посвящён многострочным формулам и сложносоставным рисункам.
 
-Текст данной главы призван привести \textit{краткие} примеры оформления текстово-графических объектов. Более подробные примеры можно посмотреть в следующей главе, а также в рекомендациях студентам \cite{spbpu-student-thesis-template-author-guide}. 
+Текст данной главы призван привести \textit{краткие} примеры оформления текстово-графических объектов. Более подробные примеры можно посмотреть в следующей главе, а также в рекомендациях студентам \cite{spbpu-student-thesis-template-author-guide}.
 
 
 \section{Название параграфа} \label{ch1:sec1}
@@ -26,18 +26,17 @@
 \end{equation}
 %
 %
-\begin{figure}[ht!] 
+\begin{figure}[ht!]
 	\center
-	\includegraphics [scale=0.27] {my_folder/images//spbpu_hydrotower}
-	\caption{Вид на гидробашню СПбПУ \cite{spbpu-gallery}} 
-	\label{fig:spbpu_hydrotower}  
+	\caption{Вид на гидробашню СПбПУ \cite{spbpu-gallery}}
+	\label{fig:spbpu_hydrotower}
 \end{figure}
 %
 %
 %\begin{table} [htbp]% Пример оформления таблицы
 %	\centering\small
 %	\caption{Представление данных для сквозного примера по ВКР \cite{Peskov2004}}%
-%	\label{tab:ToyCompare}		
+%	\label{tab:ToyCompare}
 %		\begin{tabular}{|l|l|l|l|l|l|}
 %			\hline
 %			$G$&$m_1$&$m_2$&$m_3$&$m_4$&$K$\\
@@ -47,8 +46,8 @@
 %			$g_3$&0&1&0&1&1\\ \hline
 %			$g_4$&1&2&1&0&2\\ \hline
 %			$g_5$&1&1&0&1&2\\ \hline
-%			$g_6$&1&1&1&2&2\\ \hline		
-%		\end{tabular}	
+%			$g_6$&1&1&1&2&2\\ \hline
+%		\end{tabular}
 %	\normalsize% возвращаем шрифт к нормальному
 %\end{table}
 
@@ -60,16 +59,16 @@
 На \firef{fig:spbpu_hydrotower} изображена гидробашня СПбПУ, а в \taref{tab:ToyCompare} приведены данные, на примере которых коротко и наглядно будет изложена суть ВКР.
 
 
-\section{Название параграфа} \label{ch1:sec2} 
+\section{Название параграфа} \label{ch1:sec2}
 
 
 
 Формулы могут быть размещены в несколько строк. Чтобы выставить номер формулы напротив средней строки, используйте окружение \verb|multlined| из пакета \verb|mathtools| следующим образом \cite{Ganter1999}:
 %
-\begin{equation} 
+\begin{equation}
 \label{eq:fConcept-order-ch1}
 \begin{multlined}
-(A_1,B_1)\leq (A_2,B_2)\; \Leftrightarrow \\  \Leftrightarrow\; A_1\subseteq A_2\; \Leftrightarrow \\ \Leftrightarrow\; B_2\subseteq B_1. 
+(A_1,B_1)\leq (A_2,B_2)\; \Leftrightarrow \\  \Leftrightarrow\; A_1\subseteq A_2\; \Leftrightarrow \\ \Leftrightarrow\; B_2\subseteq B_1.
 \end{multlined}
 \end{equation}
 
@@ -78,9 +77,8 @@
 (\labelcref{eq:Pi-ch1,eq:fConcept-order-ch1}).
 %
 %
-\input{my_folder/tex/fig-spbpu-whitehall-three-in-one} % пример подключения 3х иллюстрации в одном рисунке
 
-Пример ссылок \cite{Article,Book,Booklet,Conference,Inbook,Incollection,Manual,Mastersthesis,Misc,Phdthesis,Proceedings,Techreport,Unpublished,badiou:briefings}, а также ссылок с указанием страниц, на котором отображены номера страниц  \cite[с.~96]{Naidenova2017} или в виде мультицитаты на несколько источников \cites[с.~96]{Naidenova2017}[с.~46]{Ganter1999}. Часть библиографических записей носит иллюстративный характер и не имеет отношения к реальной литературе. 
+Пример ссылок \cite{Article,Book,Booklet,Conference,Inbook,Incollection,Manual,Mastersthesis,Misc,Phdthesis,Proceedings,Techreport,Unpublished,badiou:briefings}, а также ссылок с указанием страниц, на котором отображены номера страниц  \cite[с.~96]{Naidenova2017} или в виде мультицитаты на несколько источников \cites[с.~96]{Naidenova2017}[с.~46]{Ganter1999}. Часть библиографических записей носит иллюстративный характер и не имеет отношения к реальной литературе.
 
 
 
