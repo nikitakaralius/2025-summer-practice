@@ -18,152 +18,36 @@
   \item GitLeaksOnly — репозиторий, содержащий только стандартизированный gitleaks пайплайн.
 \end{itemize}
 
-\section{Формирование ключевых подходов создания конвейеров} \label{sec:gitlab-pipelines-key-principles}
-\subsection{Компоненты} \label{subsec:components}
-За основу конфигураций конвейеров были выбраны задачи (jobs).
-Задачи, в отличие от шагов, не сохраняют контекст выполнения, что в некоторых ситуациях требует его передачи между задачами,
-что замедляет конвейер из-за дополнительных сетевых взаимодействий.
-Как уже упоминалось, контекст между задачами не передается, а передача образов или собранных C\# проектов через артефакты занимает слишком много времени.
-Поэтому все места, где требуется передача больших объемов данных, были переделаны в один большой скрипт.
+\section{GitLab Components} \label{sec:gl-components}
+В рамках миграции CI/CD пайплайнов с GitHub на GitLab одним из ключевых решений стало использование компонентов
+для обеспечения переиспользования логики конвейеров и той самой стандартизации.
+Данная секция посвящена рассмотрению компонентов как фундаментального элемента организации CI/CD процессов в GitLab.
 
-Для повторного использования логики конвейеров, например, создания нового микросервиса или библиотеки, используются компоненты.
-У компонента есть входные параметры, и вся их логика заключается в подстановке этих параметров в код компонента и копировании кода компонента в конфигурацию конвейера.
-По внутренней реализации компоненты делятся на два типа:
+\subsection{Назначение и роль компонентов} \label{subsec:components-role}
+Компоненты в GitLab CI/CD\cite{gl-components} представляют собой механизм для создания переиспользуемых блоков конфигурации конвейеров.
+Основная цель их применения заключается в стандартизации и упрощении процесса создания новых пайплайнов,
+особенно для типовых сценариев, таких как развертывание микросервисов или сборка библиотек.
+Компоненты служат заменой шаблонных файлов конфигурации, которые активно использовались в GitHub Actions.
+В отличие от простого копирования конфигураций, компоненты предоставляют параметризованный подход,
+позволяющий настраивать поведение пайплайна через входные параметры без необходимости дублирования кода.
+
+\subsection{Принцип работы компонентов} \label{subsec:components-work-principals}
+Механизм функционирования компонентов основан на принципе подстановки параметров и копирования кода.
+При использовании компонента GitLab выполняет следующие операции:
 \begin{enumerate}
-  \item Явные — автономные компоненты, которые содержат полноценную логику и начинают работу сразу после подключения.
-  Они предназначены для замены шаблонных файлов конфигурации конвейеров GitHub, которые можно было переиспользовать, задавая нужные параметры.
-  \item Неявные — компоненты, которые обычно содержат одну скрытую задачу и вызываются явно через ключевое слово \texttt{extends}.
-  Они используются как шаблонные задачи, а не полноценные конвейеры.
-  Необходимость в таких компонентах возникла из-за потребности в установке параметров задачи на основе результатов предыдущей задачи, что невозможно с явными компонентами, так как они статические.
+  \item Обработка входных параметров — система анализирует переданные параметры и выполняет их валидацию согласно спецификации компонента;
+  \item Подстановка значений — происходит замена шаблонов в коде компонента на соответствующие значения параметров;
+  \item Интеграция в конвейер — обработанный код компонента включается в итоговую конфигурацию пайплайна.
 \end{enumerate}
 
-На рисунке~\ref{fig:implicit-component-code} представлен пример неявного компонента, который использует Molecule для тестирования Ansible ролей.
-На нем также можно увидеть вызов явного компонента \texttt{load-vault-secrets}.
-Пример того, как определен явный компонент, можно увидеть на рисунке~\ref{fig:explicit-component-code}.
+\subsection{Хранение компонентов} \label{subsec:components-storage}
+Компоненты должны храниться в специализированных GitLab репозиториях, путь к ним должен выглядеть следующим образом:
+\begin{verbatim}
+$CI_SERVER_FQDN/system/components/[component-name]
+\end{verbatim}
 
-\begin{figure}
-  \centering
-  \scriptsize
-  \begin{verbatim}
-    spec:
-      inputs:
-        molecule-command:
-          description: "Command to run on molecule"
-          default: "test"
-        molecule-image:
-          type: string
-          description: "Docker image used for running Molecule tests in the pipeline"
-          default: cr.yandex/crpcl8cpek7o88jk1vg7/ansible-molecule:latest
-        molecule-working-dir:
-          type: string
-          description: "The working directory where Molecule tests are executed. This directory is set as the MOLECULE_PROJECT_DIRECTORY environment variable during the pipeline run."
-          default: "./"
-    ---
-    workflow:
-      auto_cancel:
-        on_new_commit: interruptible
-      rules:
-        - when: always
-
-    default:
-      interruptible: true
-
-    stages:
-      - load-secrets
-      - test
-
-    include:
-      - component: $CI_SERVER_FQDN/system/components/load-vault-secrets/load-vault-secrets@2
-
-    load-vault-secrets:
-      stage: load-secrets
-      extends: .load-vault-secrets
-      variables:
-        stable: GH_FULL_TOKEN
-
-    molecule:
-      image: $[[ inputs.molecule-image ]]
-      stage: test
-      services:
-        - name: cr.yandex/crp2cvbrp76d7dmfegco/docker.io/docker:20.10.16-dind
-          variables:
-            HEALTHCHECK_TCP_PORT: "2376"
-      variables:
-        PY_COLORS: '1'
-        ANSIBLE_FORCE_COLOR: '1'
-        MOLECULE_PROJECT_DIRECTORY: $[[ inputs.molecule-working-dir ]]
-      script:
-        - echo "Add gitlab authorization..."
-        - mkdir -p ~/.ssh
-        - echo -e "$GITLAB_SSH_PRIVATE_KEY_BASE64" | base64 -d > ~/.ssh/gitlab_ssh.key
-        - chmod 600 ~/.ssh/gitlab_ssh.key
-        - echo -e "$GITLAB_KNOWN_HOSTS" > ~/.ssh/known_hosts
-        - export GIT_SSH_COMMAND="ssh -i ~/.ssh/gitlab_ssh.key"
-        - echo "MOLECULE_PROJECT_DIRECTORY= '$MOLECULE_PROJECT_DIRECTORY'"
-        - git config --global url."git@mindbox.gitlab.yandexcloud.net:".insteadOf "https://mindbox.gitlab.yandexcloud.net/"
-
-      # Temp github auth
-        - git config --global url."https://octopus-mindbox:${GH_FULL_TOKEN}@github.com/mindbox-cloud".insteadOf "https://github.com/mindbox-cloud"
-        - cd "$MOLECULE_PROJECT_DIRECTORY" || exit 1
-        - molecule $[[ inputs.molecule-command ]]
-  \end{verbatim}
-  \caption{Пример неявного компонента}
-  \label{fig:implicit-component-code}
-\end{figure}
-
-\begin{figure}
-  \centering
-  \scriptsize
-  \begin{verbatim}
-    spec:
-      inputs: {}
-
-    ---
-
-    .load-vault-secrets:
-      image: cr.yandex/crpcl8cpek7o88jk1vg7/vault:latest
-      tags:
-        - tiny
-        - yandex
-      stage: .pre
-      variables:
-        omega:
-        sigma:
-        stable:
-        staging:
-        infra:
-        infra_staging:
-      script:
-        - # ommitted for brevity
-      artifacts:
-        access: 'none'
-        reports:
-          dotenv: result.env
-  \end{verbatim}
-  \caption{Пример явного компонента}
-  \label{fig:explicit-component-code}
-\end{figure}
-
-\section{Принцип запуска конвейеров в GitLab} \label{sec:pipeline-run-principal}
-В отличие от GitHub, где конфигурация пайплайна может быть распределена по нескольким файлам,
-в GitLab начало работы конвейера определяется централизованно в файле \texttt{.gitlab-ci.yml}.
-Чтобы сохранить структуру, привычную разработчикам (где для каждого триггера или функциональности используется отдельный файл конфигурации),
-было принято решение создавать аналогичные отдельные файлы,
-но вызывать их в GitLab с помощью механизма нисходящего пайплайна.
-Это означает, что в файле \texttt{.gitlab-ci.yml} для каждого события создается отдельная задача,
-которая запускает соответствующий конвейер при срабатывании триггера.
-
-Данный подход, в отличие от простого подключения компонентов, позволяет избежать коллизий переменных и проблем с правилами запуска.
-Кроме того, он позволяет использовать группы ресурсов, чтобы предотвратить одновременный деплой нескольких версий.
-
-Для проверки пригодности данной структуры был переведен рабочий микросервис с GitHub на GitLab (Рис. \ref{fig:pipeline-run-result}).
-
-\begin{figure}[H]
-  \centering
-  \includegraphics[width=16cm]{img/pipeline-run-result}
-  \caption{Результат работы конвейера}
-  \label{fig:pipeline-run-result}
-\end{figure}
+Отчасти навязывание подобной структуры удобно: знания о такой организации описаны в документации GitLab,
+не будет необходимости дополнительно обучать сотрудников, как работают конвейеры в компании.
 
 \section{Консольное приложение для автоматического переноса репозиториев из GitHub в GitLab} \label{sec:gitlab-migrator-app}
 Консольное приложение, далее именуемое мигратором, представляет собой конечный автомат\cite{fsm} с возможностью запуска нескольких экземпляров одновременно.
