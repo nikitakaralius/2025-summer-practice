@@ -1,4 +1,4 @@
-\chapter{Реализация компонентов и приложения-мигратора} \label{ch:ch3}
+\usepackage{csquotes}\chapter{Реализация компонентов и приложения-мигратора} \label{ch:ch3}
 После того как команда определилась с процессом миграции, параллельно началась разработка как компонентов, так и приложения-мигратора.
 В этой главе будут приведены листинги с их реализацией и пояснениями.
 
@@ -12,6 +12,123 @@
 потому что GitLab в документации не давал обозначения тем вещам, которые мы упоминали часто, но для них не было слова.
 
 \subsection{Компонентный конвейер} \label{subsec:component-template}
+В главе \enquote{Использование компонентов}\cite{subsec:component-usage} упоминалось,
+что GitLab предоставляет возможность подключать готовые конвейеры как нисходящие.
+Именно поэтому в команде конвейерами также стали называть готовые шаблоны, которые можно подключить
+к основному, но при этом нельзя расширить как задачу.
+На рисунке ~\ref{fig:component-pipeline} представлен код такого конвейера.
+Он используется для тестирования Ansible ролей при помощи \texttt{Molecule}\cite{molecule}.
+%% возможно, место для примера подключения.
+
+\begin{figure}
+  \centering
+  \scriptsize
+  \begin{verbatim}
+    # Спецификация входных параметров компонента
+    spec:
+      inputs:
+        # Параметр команды для выполнения Molecule
+        molecule-command:
+          # Описание параметра
+          description: "Command to run on molecule"
+          # Значение по умолчанию - запуск тестов
+          default: "test"
+        # Параметр Docker-образа для тестирования
+        molecule-image:
+          # Тип параметра - строка
+          type: string
+          # Описание образа
+          description: "Docker image used for running Molecule tests in the pipeline"
+          # Образ по умолчанию из Yandex Container Registry
+          default: cr.yandex/crpcl8cpek7o88jk1vg7/ansible-molecule:latest
+        # Параметр рабочей директории для тестов
+        molecule-working-dir:
+          # Тип параметра - строка
+          type: string
+          # Подробное описание назначения
+          description: "The working directory where Molecule tests are executed. This directory is set as the MOLECULE_PROJECT_DIRECTORY environment variable during the pipeline run."
+          # Значение по умолчанию - текущая директория
+          default: "./"
+    ---
+    # Настройки рабочего процесса конвейера
+    workflow:
+      auto_cancel:
+        # Прерывание предыдущих запусков при новом коммите
+        on_new_commit: interruptible
+      rules:
+        # Запуск конвейера всегда
+        - when: always
+
+    # Настройки по умолчанию для всех задач
+    default:
+      # Разрешение прерывания задач
+      interruptible: true
+
+    # Определение стадий выполнения
+    stages:
+      # Загрузка секретов
+      - load-secrets
+      # Выполнение тестов
+      - test
+
+    # Подключение внешних компонентов
+    include:
+      - component: $CI_SERVER_FQDN/system/components/load-vault-secrets/load-vault-secrets@2
+
+    # Задача загрузки секретов из Vault
+    load-vault-secrets:
+      stage: load-secrets
+      extends: .load-vault-secrets
+      variables:
+        # Токен доступа к GitHub
+        stable: GH_FULL_TOKEN
+
+    # Основная задача тестирования с Molecule
+    molecule:
+      # Использование Docker-образа из входных параметров
+      image: $[[ inputs.molecule-image ]]
+      stage: test
+      services:
+        # Docker-in-Docker сервис
+        - name: cr.yandex/crp2cvbrp76d7dmfegco/docker.io/docker:20.10.16-dind
+          variables:
+            # Порт для проверки состояния Docker
+            HEALTHCHECK_TCP_PORT: "2376"
+      variables:
+        # Включение цветного вывода Python
+        PY_COLORS: '1'
+        # Принудительное включение цветов Ansible
+        ANSIBLE_FORCE_COLOR: '1'
+        # Рабочая директория Molecule
+        MOLECULE_PROJECT_DIRECTORY: $[[ inputs.molecule-working-dir ]]
+      script:
+        # Настройка авторизации GitLab
+        - echo "Add gitlab authorization..."
+        # Создание директории для SSH ключей
+        - mkdir -p ~/.ssh
+        # Декодирование SSH ключа
+        - echo -e "$GITLAB_SSH_PRIVATE_KEY_BASE64" | base64 -d > ~/.ssh/gitlab_ssh.key
+        # Установка прав доступа к SSH ключу
+        - chmod 600 ~/.ssh/gitlab_ssh.key
+        # Добавление известных хостов
+        - echo -e "$GITLAB_KNOWN_HOSTS" > ~/.ssh/known_hosts
+        # Настройка SSH команды для Git
+        - export GIT_SSH_COMMAND="ssh -i ~/.ssh/gitlab_ssh.key"
+        # Вывод рабочей директории
+        - echo "MOLECULE_PROJECT_DIRECTORY= '$MOLECULE_PROJECT_DIRECTORY'"
+        # Настройка Git URL для SSH
+        - git config --global url."git@mindbox.gitlab.yandexcloud.net:".insteadOf "https://mindbox.gitlab.yandexcloud.net/"
+
+        # Временная авторизация GitHub
+        - git config --global url."https://octopus-mindbox:${GH_FULL_TOKEN}@github.com/mindbox-cloud".insteadOf "https://github.com/mindbox-cloud"
+        # Переход в рабочую директорию с проверкой
+        - cd "$MOLECULE_PROJECT_DIRECTORY" || exit 1
+        # Выполнение команды Molecule
+        - molecule $[[ inputs.molecule-command ]]
+  \end{verbatim}
+  \caption{Пример кода компонентного пайплайна}
+  \label{fig:component-pipeline}
+\end{figure}
 
 
 \section{Выводы} \label{sec:conclusion}
