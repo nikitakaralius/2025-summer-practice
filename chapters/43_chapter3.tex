@@ -273,9 +273,9 @@ spec:
 Чтобы их не потерять и перенести, в инструмент был добавлен функционал команд,
 которые вызывались автоматически раз в определенное время при помощи уже известных конвейеров в GitLab.
 Самой первой такой командой стал улучшенный скрипт, собирающий информацию о репозиториях и в этот раз автоматически вносящий изменения в файл с состоянием переноса.
-Код этой команды представлен на листинге ~\cite{lst:update-migration-state-command}.
+Код этой команды представлен на листинге ~\ref{lst:update-migration-state-command}.
 
-\begin{lstlisting}[language=csharp,label={lst:update-migration-state-command},caption={Код команды обновления информации о репозиториях}]
+\begin{lstlisting}[language=c#,label={lst:update-migration-state-command},caption={Код команды обновления информации о репозиториях}]
 // Подключение необходимых сервисов и библиотек
 using Github.Application.Services;
 using Lib.Commands;
