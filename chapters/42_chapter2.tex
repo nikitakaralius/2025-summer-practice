@@ -77,61 +77,74 @@
   Необходимость в таких компонентах возникла из-за потребности в установке параметров задачи на основе результатов предыдущей задачи, что невозможно с явными компонентами, так как они статические.
 \end{enumerate}
 
+На рисунке~\ref{fig:implicit-component-code} представлен пример неявного компонента, который использует Molecule для тестирования Ansible ролей.
+На нем также можно увидеть вызов явного компонента (\texttt{load-vault-secrets}).
+
 \begin{figure}
   \centering
   \scriptsize
   \begin{verbatim}
     spec:
       inputs:
-        stage:
-          description: 'The stage in which the job should run'
-          default: ""
-        solutionName:
-            description: 'Name for solution'
-        dotnet-image:
+        molecule-command:
+          description: "Command to run on molecule"
+          default: "test"
+        molecule-image:
           type: string
-          default: "cr.yandex/crpetiko0nqk7f4hqfl3/mcr.microsoft.com/dotnet/sdk:8.0"
-        need-tests:
+          description: "Docker image used for running Molecule tests in the pipeline"
+          default: cr.yandex/crpcl8cpek7o88jk1vg7/ansible-molecule:latest
+        molecule-working-dir:
           type: string
-          default: "true"
-        dev-publish-branch:
-          type: string
-          default: "publish-dev"
-        dev-publish-tag:
-          type: string
-          default: "dev"
-
+          description: "The working directory where Molecule tests are executed. This directory is set as the MOLECULE_PROJECT_DIRECTORY environment variable during the pipeline run."
+          default: "./"
     ---
+    workflow:
+      auto_cancel:
+        on_new_commit: interruptible
+      rules:
+        - when: always
 
-    .build-nuget-package:
-      image: $[[ inputs.dotnet-image ]]
-      stage: $[[ inputs.stage ]]
+    default:
+      interruptible: true
+
+    stages:
+      - load-secrets
+      - test
+
+    include:
+      - component: $CI_SERVER_FQDN/system/components/load-vault-secrets/load-vault-secrets@2
+
+    load-vault-secrets:
+      stage: load-secrets
+      extends: .load-vault-secrets
       variables:
-          WARN_AS_ERROR: true
-          TESTS_FILTER: ""
-      before_script:
-        - dotnet nuget update source private --username ci --password $PRIVATE_PACKAGES_TOKEN --store-password-in-clear-text
-        - dotnet restore $[[ inputs.solutionName ]]
+        stable: GH_FULL_TOKEN
+
+    molecule:
+      image: $[[ inputs.molecule-image ]]
+      stage: test
+      services:
+        - name: cr.yandex/crp2cvbrp76d7dmfegco/docker.io/docker:20.10.16-dind
+          variables:
+            HEALTHCHECK_TCP_PORT: "2376"
+      variables:
+        PY_COLORS: '1'
+        ANSIBLE_FORCE_COLOR: '1'
+        MOLECULE_PROJECT_DIRECTORY: $[[ inputs.molecule-working-dir ]]
       script:
-        - dotnet build ./$[[ inputs.solutionName ]] --configuration Release --no-restore ${WARN_AS_ERROR:+/warnaserror}
-        - |
-          if [[ "$[[ inputs.need-tests ]]" = "true" ]]; then
-            if [ ! -z $TESTS_FILTER ]; then
-              dotnet test --configuration Release --no-build --no-restore --filter "${TESTS_FILTER}"
-            else
-              dotnet test --configuration Release --no-build --no-restore
-            fi
-          fi
-        - |
-          if [[ $CI_COMMIT_BRANCH =~ ^$[[ inputs.dev-publish-branch ]]\/? ]]; then
-            dotnet pack ./$[[ inputs.solutionName ]] --no-build -c Release -p:BuildNumber=$CI_PIPELINE_IID -p:VersionTag="-$[[ inputs.dev-publish-tag ]]"
-          else
-            dotnet pack ./$[[ inputs.solutionName ]] --no-build -c Release -p:BuildNumber=$CI_PIPELINE_IID
-          fi
-      artifacts:
-        paths:
-          - '**/*.nupkg'
-        expire_in: 2h
+        - echo "Add gitlab authorization..."
+        - mkdir -p ~/.ssh
+        - echo -e "$GITLAB_SSH_PRIVATE_KEY_BASE64" | base64 -d > ~/.ssh/gitlab_ssh.key
+        - chmod 600 ~/.ssh/gitlab_ssh.key
+        - echo -e "$GITLAB_KNOWN_HOSTS" > ~/.ssh/known_hosts
+        - export GIT_SSH_COMMAND="ssh -i ~/.ssh/gitlab_ssh.key"
+        - echo "MOLECULE_PROJECT_DIRECTORY= '$MOLECULE_PROJECT_DIRECTORY'"
+        - git config --global url."git@mindbox.gitlab.yandexcloud.net:".insteadOf "https://mindbox.gitlab.yandexcloud.net/"
+
+      # Temp github auth
+        - git config --global url."https://octopus-mindbox:${GH_FULL_TOKEN}@github.com/mindbox-cloud".insteadOf "https://github.com/mindbox-cloud"
+        - cd "$MOLECULE_PROJECT_DIRECTORY" || exit 1
+        - molecule $[[ inputs.molecule-command ]]
   \end{verbatim}
   \caption{Пример неявного компонента}
   \label{fig:implicit-component-code}
@@ -142,18 +155,35 @@
   \scriptsize
   \begin{verbatim}
     stages:
-      - test-release
+      - build-nuget-package
 
     include:
-      - component: link-to-component/create-gitlab-release.yml
+      - component: $CI_SERVER_FQDN/system/components/dotnet-nuget-cicd-components/build-nuget-package@2
         inputs:
+          stage: build-nuget-package
+          solutionName: Mindbox.GraphQL.sln
 
-    create-gitlab-release:
+    translation-checker:
+      extends: .translation-checker
       rules:
-        - if: $CI_COMMIT_BRANCH == "main"
-      extends:
-        - .create-gitlab-release
-      stage: test-release
+        - if: $CI_MERGE_REQUEST_ID
+          when: always
+        - when: never
+
+    ensure-bump-mr:
+      extends: .ensure-bump-mr
+      rules:
+        - if: $CI_MERGE_REQUEST_ID
+          when: always
+        - when: never
+
+    build-nuget-package:
+      extends: .build-nuget-package
+      rules:
+        - if: $CI_MERGE_REQUEST_ID
+          when: always
+        - when: never
+
   \end{verbatim}
   \caption{Пример использования неявного компонента}
   \label{fig:implicit-component-code-usage}
