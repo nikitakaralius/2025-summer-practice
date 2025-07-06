@@ -342,4 +342,58 @@ internal class UpdateMigrationStateCommand(
 }
 \end{lstlisting}
 
+Также на следующем листинге приведена реализация шага из первой фазы по уведомлению о начале переноса.
+
+\begin{lstlisting}[language=c#,label={lst:internal-work-started-step},caption={Код шага оповещения о старте начала работ}]
+// Подключение сервиса для работы с циклами уведомлений
+using Lib.Loop.Services;
+// Подключение логирования Microsoft
+using Microsoft.Extensions.Logging;
+// Подключение доменных моделей миграции
+using Migration.Domain;
+// Подключение библиотеки для работы с union типами
+using OneOf;
+
+namespace Migration.Application.Internal.Execution.Stages.FirstPhase;
+
+// Процессор стадии уведомления о начале внутренней работы
+internal class InternalWorkStartNotifyingStageProcessor(
+    // Сервис для отправки сообщений в Loop
+    ILoopService loopService
+// Реализация интерфейса процессора стадий
+) : IStageProcessor
+{
+    // Асинхронный метод обработки стадии миграции
+    public async Task<OneOf<RepositoryMigrationStage, string>> ProcessAsync(MigrationContext context, ILogger logger)
+    {
+        // Проверка типа миграции - пропуск
+        if (context.MigrationType is MigrationType.Skip)
+            // Возврат состояния завершенной миграции
+            return RepositoryMigrationStage.Completed;
+
+        // Проверка типа миграции - копирование
+        if (context.MigrationType is MigrationType.Copy)
+            // Переход к стадии начала миграции репозитория
+            return RepositoryMigrationStage.RepositoryMigrationMarkedToStart;
+
+        // Отправка уведомления команде о начале работы
+        var result = await loopService.PostMessage(GenerateMessage(context), context.Team);
+        // Проверка результата отправки сообщения
+        if (result is not null)
+        {
+            // Возврат ошибки, если отправка не удалась
+            return result;
+        }
+
+        // Возврат состояния успешного уведомления
+        return RepositoryMigrationStage.InternalWorkStartNotified;
+    }
+
+    // Приватный метод генерации текста уведомления
+    private string GenerateMessage(MigrationContext context) =>
+        // Формирование сообщения с предупреждением о начале миграции
+        $"Началась миграция пайплайна в репозитории: {context.RepositoryName}. ** Пожалуйста, не меняйте его Workflow ** ";
+}
+\end{lstlisting}
+
 \section{Выводы} \label{sec:conclusion}
