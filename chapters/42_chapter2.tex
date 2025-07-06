@@ -88,63 +88,68 @@
   Необходимость в них возникла из-за потребности в установке параметров задачи (job) на основе результатов предыдущей задачи, что невозможно с компонентами, так как они статические.
 \end{enumerate}
 
-\begin{minted}{yaml}
-spec:
-  inputs:
-    stage:
-    release-number:
-      default: "1.0.0"
+\begin{figure}
+  \centering
+  \scriptsize
+  \begin{verbatim}
+    spec:
+      inputs:
+        stage:
+        release-number:
+          default: "1.0.0"
 
----
+    ---
 
-.prepare-release-helper:
-  variables:
-    RELEASE_NUMBER: $[[ inputs.release-number ]]
-  script:
-    - |
-      # creating release number
+    .prepare-release-helper:
+      variables:
+        RELEASE_NUMBER: $[[ inputs.release-number ]]
+      script:
+        - |
+          # creating release number
 
-.create-gitlab-release:
-  stage: $[[ inputs.stage ]]
-  tags:
-    - yandex
-    - tiny
-  image: registry.com/system/images/docker-dind:latest
-  variables: !reference [.prepare-release-helper, variables]
-  before_script:
-    # копирует код скрипта из вспомогательной джобы
-    - !reference [.prepare-release-helper, script]
-  script:
-    - |
-      # creating release, and some write some variables to env file
-  artifacts:
-    reports:
-      dotenv:
-        - release_additional_outputs.env
-\end{minted}
+    .create-gitlab-release:
+      stage: $[[ inputs.stage ]]
+      tags:
+        - yandex
+        - tiny
+      image: registry.com/system/images/docker-dind:latest
+      variables: !reference [.prepare-release-helper, variables]
+      before_script:
+        # копирует код скрипта из вспомогательной джобы
+        - !reference [.prepare-release-helper, script]
+      script:
+        - |
+          # creating release, and some write some variables to env file
+      artifacts:
+        reports:
+          dotenv:
+            - release_additional_outputs.env
+  \end{verbatim}
+  \caption{Пример неявного компонента}
+  \label{fig:implicit-component-code}
+\end{figure}
 
-\captionof{listing}{Пример неявного компонента}
+\begin{figure}
+  \centering
+  \scriptsize
+  \begin{verbatim}
+    stages:
+      - test-release
 
-\newpage % Начать листинг на новой странице
+    include:
+      - component: link-to-component/create-gitlab-release.yml
+        inputs:
 
-\begin{minted}{yaml}
-stages:
-  - test-release
-
-include:
-  - component: link-to-component/create-gitlab-release.yml
-    inputs:
-
-create-gitlab-release:
-  rules:
-    - if: $CI_COMMIT_BRANCH == "main"
-  extends:
-    - .create-gitlab-release
-  stage: test-release
-
-\end{minted}
-
-\captionof{listing}{Пример использования неявного компонента}
+    create-gitlab-release:
+      rules:
+        - if: $CI_COMMIT_BRANCH == "main"
+      extends:
+        - .create-gitlab-release
+      stage: test-release
+  \end{verbatim}
+  \caption{Пример использования неявного компонента}
+  \label{fig:implicit-component-code-usage}
+\end{figure}
 
 
 \section{Принцип запуска конвейера}
