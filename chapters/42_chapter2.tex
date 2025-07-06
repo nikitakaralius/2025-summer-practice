@@ -78,7 +78,8 @@
 \end{enumerate}
 
 На рисунке~\ref{fig:implicit-component-code} представлен пример неявного компонента, который использует Molecule для тестирования Ansible ролей.
-На нем также можно увидеть вызов явного компонента (\texttt{load-vault-secrets}).
+На нем также можно увидеть вызов явного компонента \texttt{load-vault-secrets}.
+Пример того, как определен явный компонент, можно увидеть на рисунке~\ref{fig:explicit-component-code}.
 
 \begin{figure}
   \centering
@@ -154,41 +155,34 @@
   \centering
   \scriptsize
   \begin{verbatim}
-    stages:
-      - build-nuget-package
+    spec:
+      inputs: {}
 
-    include:
-      - component: $CI_SERVER_FQDN/system/components/dotnet-nuget-cicd-components/build-nuget-package@2
-        inputs:
-          stage: build-nuget-package
-          solutionName: Mindbox.GraphQL.sln
+    ---
 
-    translation-checker:
-      extends: .translation-checker
-      rules:
-        - if: $CI_MERGE_REQUEST_ID
-          when: always
-        - when: never
-
-    ensure-bump-mr:
-      extends: .ensure-bump-mr
-      rules:
-        - if: $CI_MERGE_REQUEST_ID
-          when: always
-        - when: never
-
-    build-nuget-package:
-      extends: .build-nuget-package
-      rules:
-        - if: $CI_MERGE_REQUEST_ID
-          when: always
-        - when: never
-
+    .load-vault-secrets:
+      image: cr.yandex/crpcl8cpek7o88jk1vg7/vault:latest
+      tags:
+        - tiny
+        - yandex
+      stage: .pre
+      variables:
+        omega:
+        sigma:
+        stable:
+        staging:
+        infra:
+        infra_staging:
+      script:
+        - # ommitted for brevity
+      artifacts:
+        access: 'none'
+        reports:
+          dotenv: result.env
   \end{verbatim}
-  \caption{Пример использования неявного компонента}
-  \label{fig:implicit-component-code-usage}
+  \caption{Пример явного компонента}
+  \label{fig:explicit-component-code}
 \end{figure}
-
 
 \section{Принцип запуска конвейеров в GitLab} \label{sec:pipeline-run-principal}
 В отличие от GitHub, где конфигурация пайплайна может быть распределена по нескольким файлам,
