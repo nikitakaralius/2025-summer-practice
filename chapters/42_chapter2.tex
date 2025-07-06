@@ -84,35 +84,54 @@
     spec:
       inputs:
         stage:
-        release-number:
-          default: "1.0.0"
+          description: 'The stage in which the job should run'
+          default: ""
+        solutionName:
+            description: 'Name for solution'
+        dotnet-image:
+          type: string
+          default: "cr.yandex/crpetiko0nqk7f4hqfl3/mcr.microsoft.com/dotnet/sdk:8.0"
+        need-tests:
+          type: string
+          default: "true"
+        dev-publish-branch:
+          type: string
+          default: "publish-dev"
+        dev-publish-tag:
+          type: string
+          default: "dev"
 
     ---
 
-    .prepare-release-helper:
-      variables:
-        RELEASE_NUMBER: $[[ inputs.release-number ]]
-      script:
-        - |
-          # creating release number
-
-    .create-gitlab-release:
+    .build-nuget-package:
+      image: $[[ inputs.dotnet-image ]]
       stage: $[[ inputs.stage ]]
-      tags:
-        - yandex
-        - tiny
-      image: registry.com/system/images/docker-dind:latest
-      variables: !reference [.prepare-release-helper, variables]
+      variables:
+          WARN_AS_ERROR: true
+          TESTS_FILTER: ""
       before_script:
-        # копирует код скрипта из вспомогательной джобы
-        - !reference [.prepare-release-helper, script]
+        - dotnet nuget update source private --username ci --password $PRIVATE_PACKAGES_TOKEN --store-password-in-clear-text
+        - dotnet restore $[[ inputs.solutionName ]]
       script:
+        - dotnet build ./$[[ inputs.solutionName ]] --configuration Release --no-restore ${WARN_AS_ERROR:+/warnaserror}
         - |
-          # creating release, and some write some variables to env file
+          if [[ "$[[ inputs.need-tests ]]" = "true" ]]; then
+            if [ ! -z $TESTS_FILTER ]; then
+              dotnet test --configuration Release --no-build --no-restore --filter "${TESTS_FILTER}"
+            else
+              dotnet test --configuration Release --no-build --no-restore
+            fi
+          fi
+        - |
+          if [[ $CI_COMMIT_BRANCH =~ ^$[[ inputs.dev-publish-branch ]]\/? ]]; then
+            dotnet pack ./$[[ inputs.solutionName ]] --no-build -c Release -p:BuildNumber=$CI_PIPELINE_IID -p:VersionTag="-$[[ inputs.dev-publish-tag ]]"
+          else
+            dotnet pack ./$[[ inputs.solutionName ]] --no-build -c Release -p:BuildNumber=$CI_PIPELINE_IID
+          fi
       artifacts:
-        reports:
-          dotenv:
-            - release_additional_outputs.env
+        paths:
+          - '**/*.nupkg'
+        expire_in: 2h
   \end{verbatim}
   \caption{Пример неявного компонента}
   \label{fig:implicit-component-code}
