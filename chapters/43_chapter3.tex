@@ -19,7 +19,7 @@
 На листинге ~\ref{lst:component-pipeline} представлен код такого конвейера.
 Он используется для тестирования Ansible ролей при помощи \texttt{Molecule}\cite{molecule}.
 
-\begin{lstlisting}[language=yaml,label={lst:component-pipeline}]
+\begin{lstlisting}[language=yaml,label={lst:component-pipeline},caption={Компонентный конвейер тестирования через Molecule}]
 # Спецификация входных параметров компонента
 spec:
   inputs:
@@ -137,7 +137,7 @@ molecule:
 дублирование подключения внешних задач из конвейера в конвейер противоречит изначальной цели стандартизации.
 Код задания шаблона для задачи \texttt{load-vault-secret} показан и прокомментирован на листинге ~\ref{lst:component-template}.
 
-\begin{lstlisting}[language=yaml,label={lst:component-template}]
+\begin{lstlisting}[language=yaml,label={lst:component-template},caption={Компонентный шаблон для load-vault-secret}]
 # Спецификация входных параметров компонента
 spec:
   # Секция входных параметров (пустая для данного компонента)
@@ -265,6 +265,81 @@ spec:
     reports:
       # Файл с переменными окружения для передачи в последующие задачи
       dotenv: result.env
+\end{lstlisting}
+
+\section{Реализация приложения-мигратора} \label{sec:migrator-impl}
+Важно еще раз вспомнить, что одно из требований к переезду — не блокировать разработку.
+Трудозатраты на полную миграцию команда оценила в 1 год, за это время точно будут появляться новые репозитории.
+Чтобы их не потерять и перенести, в инструмент был добавлен функционал команд,
+которые вызывались автоматически раз в определенное время при помощи уже известных конвейеров в GitLab.
+Самой первой такой командой стал улучшенный скрипт, собирающий информацию о репозиториях и в этот раз автоматически вносящий изменения в файл с состоянием переноса.
+Код этой команды представлен на листинге ~\cite{lst:update-migration-state-command}.
+
+\begin{lstlisting}[language=c#,label={lst:update-migration-state-command},caption={Код команды обновления информации о репозиториях}]
+// Подключение необходимых сервисов и библиотек
+using Github.Application.Services;
+using Lib.Commands;
+using Microsoft.Extensions.Logging;
+using Migration.Application.Services;
+
+namespace Migration.Cli.Commands;
+
+// Команда для обновления состояния миграции
+internal class UpdateMigrationStateCommand(
+    // Сервис для работы с состоянием миграции
+    IMigrationStateService migrationStateService,
+    // Сервис для работы с репозиториями
+    IRepositoryService repositoryService,
+    // Сервис для работы с GitHub репозиториями
+    IGithubRepositoryService githubRepositoryService,
+    // Логгер для записи информации о выполнении
+    ILogger<UpdateMigrationStateCommand> logger
+// Наследование от базовой команды с указанием имени и описания
+) : CommandBase("update-migration-state", "Update Migration State")
+{
+    // Основной метод выполнения команды
+    public override async Task ExecuteAsync(CancellationToken cancellationToken)
+    {
+        // Логирование начала получения списка репозиториев
+        logger.LogInformation("list github repositories");
+
+        // Получение информации о репозиториях из GitHub
+        var repositoryInfos = await githubRepositoryService.ListRepositoriesAsync();
+        // Проверка успешности получения данных
+        if (repositoryInfos is null)
+        {
+            // Логирование ошибки при неудачном получении данных
+            logger.LogError("Failed to load repositories from Github");
+            // Завершение выполнения команды
+            return;
+        }
+
+        // Логирование начала синхронизации репозиториев с состоянием миграции
+        logger.LogInformation("reflect github repositories to migration state");
+        // Обновление файла состояния миграции данными из GitHub
+        await migrationStateService.UpdateMigrationStateFile(repositoryInfos);
+
+        // Синхронизация активных репозиториев
+        await SyncActiveRepositories();
+
+        // Логирование завершения процесса обновления
+        logger.LogInformation("update complete");
+    }
+
+    // Приватный метод для синхронизации активных репозиториев
+    private async Task SyncActiveRepositories()
+    {
+        // Логирование начала получения списка активных репозиториев
+        logger.LogInformation("list active repositories");
+        // Получение списка всех переведенных репозиториев
+        var repositories = migrationStateService.ListAllTranslated();
+
+        // Логирование начала синхронизации активных репозиториев
+        logger.LogInformation("sync active repositories");
+        // Выполнение синхронизации репозиториев
+        await repositoryService.SyncRepositoriesAsync(repositories);
+    }
+}
 \end{lstlisting}
 
 \section{Выводы} \label{sec:conclusion}
