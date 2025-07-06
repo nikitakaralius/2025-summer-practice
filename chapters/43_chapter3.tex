@@ -11,7 +11,7 @@
 Стоит отметить, что выработавшиеся подходы и названия являются терминологией внутри компании,
 потому что GitLab в документации не давал обозначения тем вещам, которые мы упоминали часто, но для них не было слова.
 
-\subsection{Компонентный конвейер} \label{subsec:component-template}
+\subsection{Компонентный конвейер} \label{subsec:component-pipeline}
 В главе \enquote{Использование компонентов} упоминалось,
 что GitLab предоставляет возможность подключать готовые конвейеры как нисходящие.
 Именно поэтому в команде конвейерами также стали называть готовые шаблоны, которые можно подключить
@@ -75,6 +75,8 @@ include:
 # Задача загрузки секретов из Vault
 load-vault-secrets:
   stage: load-secrets
+  # Это использование задачи из внешнего компонента.
+  # Внешние задачи подробно описаны в следующей главе.
   extends: .load-vault-secrets
   variables:
     # Токен доступа к GitHub
@@ -122,6 +124,148 @@ molecule:
     - cd "$MOLECULE_PROJECT_DIRECTORY" || exit 1
     # Выполнение команды Molecule
     - molecule $[[ inputs.molecule-command ]]
+\end{lstlisting}
+
+\subsection{Компонентный шаблон} \label{subsec:component-template}
+В листинге ~\ref{lst:component-pipeline} с компонентным конвейером использовалась внешняя задача.
+В Mindbox для хранения таких задач стали использовать файлы, которые получили название \enquote{шаблоны}.
+Грубо говоря, эти шаблоны просто содержать описания задач, которые позже потом подключаются в конвейеры.
+При подключении шаблона, в отличие от конвейера, GitLab не исполняет задачи.
+Все дело в том, что задачи следуют конвенции GitLab: в начале названия они содержат точку.
+Ключевое слово \texttt{extends} при подключении внешней задачи как бы сообщает, что текущая задача наследуется от какой-то другой.
+В этом и заключается преимущество внешних задач — в них можно переопределить все параметры в рамках задачи.
+Однако эта особенность также является недостатком:
+дублирование подключения внешних задач из конвейера в конвейер противоречит изначальной цели стандартизации.
+Код задания шаблона для задачи \texttt{load-vault-secret} показан и прокомментирован на листинге ~\ref{lst:component-template}.
+
+\begin{lstlisting}[language=yaml,label={lst:component-template}]
+# Спецификация входных параметров компонента
+spec:
+  # Секция входных параметров (пустая для данного компонента)
+  inputs: {}
+
+---
+
+# Шаблон задачи для загрузки секретов из Vault
+.load-vault-secrets:
+  # Docker-образ с установленным Vault CLI
+  image: cr.yandex/crpcl8cpek7o88jk1vg7/vault:latest
+  tags:
+    # Использование небольших раннеров
+    - tiny
+    # Раннеры в Yandex Cloud
+    - yandex
+  # Выполнение в предварительной стадии
+  stage: .pre
+  variables:
+    # Переменные для различных окружений (значения задаются при использовании)
+    omega:
+    sigma:
+    stable:
+    staging:
+  script:
+    - |
+      # Функция загрузки секретов с использованием JWT аутентификации
+      function load_secrets {
+        # Получение списка ключей из аргументов функции
+        local keys="$@"
+        # Адрес Vault сервера
+        local vault_addr="$VAULT_ADDR"
+        # JWT токен для аутентификации
+        local vault_id_token="$VAULT_ID_TOKEN"
+
+        # Проверка наличия ключей для обработки
+        if [ -z "$keys" ]; then
+          return
+        fi
+
+        # Информационное сообщение о начале загрузки
+        echo "Load secrets from $vault_addr using JWT authentication"
+
+        # Настройка пути и роли для JWT аутентификации по умолчанию
+        local auth_path="jwt-gitlab-v2"
+        local auth_role="gitlab-ci"
+
+        # Получение токена доступа к Vault через JWT аутентификацию
+        export VAULT_TOKEN=$(vault write -field=token auth/$auth_path/login role=$auth_role jwt=$vault_id_token)
+
+        # Обработка каждого ключа из списка
+        for key in $keys
+        do
+          # Информационное сообщение о текущем ключе
+          echo "Processing key specification: $key"
+
+          # Парсинг формата ключа: secret_path[:field][:env_key]
+          # Извлечение пути к секрету (все до первого ':')
+          secret_path="${key%%:*}"
+          # Остаток строки после первого ':'
+          remainder="${key#*:}"
+
+          # Проверка наличия двоеточий в спецификации
+          if [[ "$secret_path" == "$remainder" ]]; then
+            # Нет двоеточий, только путь к секрету
+            field="value"
+            env_key="$secret_path"
+          else
+            # Есть минимум одно двоеточие
+            # Поле - все до следующего ':'
+            field="${remainder%%:*}"
+            # Все после второго ':'
+            env_key_part="${remainder#*:}"
+
+            # Проверка наличия второго двоеточия
+            if [[ "$field" == "$env_key_part" ]]; then
+              # Только одно двоеточие: secret_path:field
+              env_key="$secret_path"
+            else
+              # Два двоеточия: secret_path:field:env_key
+              env_key="$env_key_part"
+            fi
+          fi
+
+          # Определение полного пути в Vault
+          if echo "$secret_path" | grep -q '/'; then
+            # Путь уже содержит слеш
+            full_key="$secret_path"
+          else
+            # Добавление префикса common/ для простых имен
+            full_key="common/$secret_path"
+          fi
+
+          # Извлечение имени переменной окружения из полного пути
+          if echo "$env_key" | grep -q '/'; then
+            env_key=$(echo "$env_key" | sed 's/.*\///')
+          fi
+
+          # Вывод информации о параметрах обработки
+          echo "  -> Vault path: $full_key"
+          echo "  -> Field: $field"
+          echo "  -> Environment variable: $env_key"
+
+          # Информационное сообщение о выполняемой команде
+          echo "Executing: vault kv get -mount gitlab -field=$field $full_key"
+          # Получение значения секрета из Vault
+          if value=$(vault kv get -mount gitlab -field=$field $full_key 2>&1); then
+            # Успешное получение значения
+            echo "  -> Success: Got value for $env_key"
+            # Запись переменной в файл результатов
+            echo "$env_key=$value" >> result.env
+          else
+            # Ошибка получения секрета
+            echo "  -> ERROR: Failed to get value"
+            echo "  -> Vault error: $value"
+            echo "  -> FAILING JOB: Required secret not found"
+            # Завершение работы с ошибкой
+            exit 1
+          fi
+        done
+      }
+  artifacts:
+    # Запрет доступа к артефактам из других задач
+    access: 'none'
+    reports:
+      # Файл с переменными окружения для передачи в последующие задачи
+      dotenv: result.env
 \end{lstlisting}
 
 \section{Выводы} \label{sec:conclusion}
